@@ -12,6 +12,8 @@ import numpy as np
 from tkinter import *
 # Importer messagebox pour afficher des messages
 from tkinter import messagebox
+# Importer json pour sauvegarder les soldes dans un fichier
+import json
 
 
 # ====================================================================
@@ -24,6 +26,22 @@ def creer_dossiers():
         os.makedirs("data")
     # Afficher un message pour confirmer
     print("✓ Dossier 'data' créé ou trouvé")
+
+
+# ====================================================================
+# FONCTION 1B : Créer le fichier des soldes
+# ====================================================================
+
+def creer_fichier_soldes():
+    # Vérifier si le fichier soldes.json existe
+    if not os.path.exists("soldes.json"):
+        # Créer un dictionnaire vide
+        soldes = {}
+        # Sauvegarder dans le fichier
+        with open("soldes.json", "w") as f:
+            json.dump(soldes, f)
+    # Afficher un message pour confirmer
+    print("✓ Fichier 'soldes.json' créé ou trouvé")
 
 
 # ====================================================================
@@ -68,8 +86,8 @@ def interface_principale():
         bg="orange",
         fg="white",
         width=30,
-        # Quand on clique, appeler la fonction interface_admin
-        command=interface_admin
+        # Quand on clique, appeler la fonction authentifier_admin
+        command=authentifier_admin
     )
     # Placer le bouton
     btn_admin.pack(pady=15)
@@ -93,7 +111,85 @@ def interface_principale():
 
 
 # ====================================================================
-# FONCTION 3 : Interface Administrateur
+# FONCTION 3 : Authentifier l'administrateur
+# ====================================================================
+
+def authentifier_admin():
+    # Créer une fenêtre pour la connexion
+    fenetre_login = Toplevel()
+    # Donner un titre
+    fenetre_login.title("Connexion Administrateur")
+    # Donner une taille
+    fenetre_login.geometry("300x200")
+    # Couleur de fond
+    fenetre_login.configure(bg="lightyellow")
+    
+    # Titre
+    titre = Label(
+        fenetre_login,
+        text="AUTHENTIFICATION",
+        font=("Arial", 12, "bold"),
+        bg="lightyellow"
+    )
+    titre.pack(pady=10)
+    
+    # Label pour l'identifiant
+    label_id = Label(
+        fenetre_login,
+        text="Identifiant:",
+        font=("Arial", 11),
+        bg="lightyellow"
+    )
+    label_id.pack(pady=5)
+    
+    # Zone pour entrer l'identifiant
+    entree_id = Entry(fenetre_login, font=("Arial", 11), width=25)
+    entree_id.pack(pady=5)
+    
+    # Label pour le mot de passe
+    label_pass = Label(
+        fenetre_login,
+        text="Mot de passe:",
+        font=("Arial", 11),
+        bg="lightyellow"
+    )
+    label_pass.pack(pady=5)
+    
+    # Zone pour entrer le mot de passe (avec des points)
+    entree_pass = Entry(fenetre_login, font=("Arial", 11), width=25, show="*")
+    entree_pass.pack(pady=5)
+    
+    # Fonction pour vérifier les identifiants
+    def verifier_login():
+        # Récupérer l'identifiant et le mot de passe
+        id_admin = entree_id.get()
+        pass_admin = entree_pass.get()
+        
+        # Vérifier que c'est correct (admin / admin)
+        if id_admin == "admin" and pass_admin == "admin":
+            # Fermer la fenêtre de login
+            fenetre_login.destroy()
+            # Ouvrir l'interface admin
+            interface_admin()
+        else:
+            # Afficher un message d'erreur
+            messagebox.showerror("Erreur", "Identifiant ou mot de passe incorrect!")
+    
+    # Bouton pour se connecter
+    btn_connexion = Button(
+        fenetre_login,
+        text="Connexion",
+        font=("Arial", 11),
+        bg="orange",
+        fg="white",
+        width=20,
+        command=verifier_login
+    )
+    btn_connexion.pack(pady=10)
+
+
+# ====================================================================
+# FONCTION 4 : Interface Administrateur
 # ====================================================================
 
 def interface_admin():
@@ -102,7 +198,7 @@ def interface_admin():
     # Donner un titre
     fenetre_admin.title("Administrateur")
     # Donner une taille
-    fenetre_admin.geometry("400x250")
+    fenetre_admin.geometry("400x300")
     # Couleur de fond
     fenetre_admin.configure(bg="lightyellow")
     
@@ -128,17 +224,33 @@ def interface_admin():
     entree_nom = Entry(fenetre_admin, font=("Arial", 11), width=30)
     entree_nom.pack(pady=5)
     
+    # Label "Solde initial"
+    label_solde = Label(
+        fenetre_admin,
+        text="Solde initial (€):",
+        font=("Arial", 11),
+        bg="lightyellow"
+    )
+    label_solde.pack(pady=5)
+    
+    # Zone pour le solde
+    entree_solde = Entry(fenetre_admin, font=("Arial", 11), width=30)
+    entree_solde.insert(0, "50")
+    entree_solde.pack(pady=5)
+    
     # Fonction pour ajouter une personne
     def ajouter_personne():
         # Récupérer le nom tapé
         nom = entree_nom.get().strip()
+        # Récupérer le solde
+        solde = entree_solde.get().strip()
         # Vérifier que le nom n'est pas vide
         if nom == "":
             # Afficher une erreur si le nom est vide
             messagebox.showerror("Erreur", "Veuillez entrer un nom!")
         else:
             # Appeler la fonction pour ajouter la personne
-            ajouter_avec_photos(nom)
+            ajouter_avec_photos(nom, solde)
             # Effacer le texte dans la zone
             entree_nom.delete(0, END)
     
@@ -163,10 +275,15 @@ def interface_admin():
             # Afficher un message
             messagebox.showinfo("Liste", "Aucune personne enregistrée.")
         else:
+            # Charger les soldes
+            with open("soldes.json", "r") as f:
+                soldes = json.load(f)
             # Créer un texte avec toutes les personnes
             texte = "Personnes enregistrées:\n\n"
             for personne in liste_personnes:
-                texte += f"• {personne}\n"
+                # Afficher le nom et le solde
+                solde = soldes.get(personne, "0")
+                texte += f"• {personne} (Solde: {solde}€)\n"
             # Afficher le texte
             messagebox.showinfo("Liste des personnes", texte)
     
@@ -210,10 +327,10 @@ def interface_admin():
 
 
 # ====================================================================
-# FONCTION 4 : Ajouter une personne avec photos
+# FONCTION 5 : Ajouter une personne avec photos
 # ====================================================================
 
-def ajouter_avec_photos(nom):
+def ajouter_avec_photos(nom, solde):
     # Créer le chemin du dossier pour cette personne
     chemin_dossier = os.path.join("data", nom)
     
@@ -225,6 +342,17 @@ def ajouter_avec_photos(nom):
     
     # Créer le dossier pour cette personne
     os.makedirs(chemin_dossier)
+    
+    # Charger les soldes
+    with open("soldes.json", "r") as f:
+        soldes = json.load(f)
+    
+    # Ajouter le solde pour cette personne
+    soldes[nom] = float(solde)
+    
+    # Sauvegarder les soldes
+    with open("soldes.json", "w") as f:
+        json.dump(soldes, f)
     
     # Afficher un message d'information
     messagebox.showinfo(
@@ -314,7 +442,7 @@ def ajouter_avec_photos(nom):
 
 
 # ====================================================================
-# FONCTION 5 : Supprimer une personne
+# FONCTION 6 : Supprimer une personne
 # ====================================================================
 
 def supprimer_avec_photos(nom):
@@ -339,6 +467,19 @@ def supprimer_avec_photos(nom):
         import shutil
         # Supprimer le dossier et tout son contenu
         shutil.rmtree(chemin_dossier)
+        
+        # Charger les soldes
+        with open("soldes.json", "r") as f:
+            soldes = json.load(f)
+        
+        # Supprimer le solde de cette personne
+        if nom in soldes:
+            del soldes[nom]
+        
+        # Sauvegarder les soldes
+        with open("soldes.json", "w") as f:
+            json.dump(soldes, f)
+        
         # Afficher un message de succès
         messagebox.showinfo("Succès", f"'{nom}' a été supprimée!")
 
@@ -412,7 +553,7 @@ def entrainer_modele():
 
 
 # ====================================================================
-# FONCTION 7 : Interface Identification
+# FONCTION 9 : Interface Identification
 # ====================================================================
 
 def interface_identification():
@@ -443,6 +584,10 @@ def interface_identification():
     import json
     with open("label_map.json", "r") as f:
         label_map = json.load(f)
+    
+    # Charger les soldes
+    with open("soldes.json", "r") as f:
+        soldes = json.load(f)
     
     # Ouvrir la webcam
     capture = cv2.VideoCapture(0)
@@ -490,12 +635,35 @@ def interface_identification():
                 # Récupérer le nom du visage
                 nom = label_map.get(str(label), "Inconnu")
                 
-                # Afficher un message de succès
-                messagebox.showinfo(
-                    "Succès",
-                    f"Bienvenue {nom}!\n"
-                    f"Repas crédité!"
-                )
+                # Récupérer le solde
+                solde_actuel = soldes.get(nom, 0)
+                
+                # Vérifier que le solde est suffisant (5€ pour un repas)
+                if solde_actuel >= 5:
+                    # Déduire 5€ du solde
+                    soldes[nom] = solde_actuel - 5
+                    
+                    # Sauvegarder les soldes
+                    with open("soldes.json", "w") as f:
+                        json.dump(soldes, f)
+                    
+                    # Afficher un message de succès
+                    messagebox.showinfo(
+                        "Succès",
+                        f"Bienvenue {nom}!\n"
+                        f"Repas crédité!\n"
+                        f"Ancien solde: {solde_actuel:.2f}€\n"
+                        f"Nouveau solde: {soldes[nom]:.2f}€"
+                    )
+                else:
+                    # Afficher un message d'erreur (solde insuffisant)
+                    messagebox.showerror(
+                        "Erreur",
+                        f"{nom},\n"
+                        f"Solde insuffisant!\n"
+                        f"Solde actuel: {solde_actuel:.2f}€"
+                    )
+                
                 # Arrêter la boucle
                 identifie = True
                 break
@@ -537,5 +705,7 @@ def interface_identification():
 if __name__ == "__main__":
     # Créer les dossiers nécessaires
     creer_dossiers()
+    # Créer le fichier des soldes
+    creer_fichier_soldes()
     # Lancer l'interface principale
     interface_principale()

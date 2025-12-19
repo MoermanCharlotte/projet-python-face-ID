@@ -420,7 +420,7 @@ def afficher_capture_photos(nom, solde):
             if not ret:
                 break
             
-            # Convertir en niveaux de gris
+            # Convertir en niveaux de gris pour la détection
             frame_gris = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
             
             # Détecter les visages
@@ -430,6 +430,21 @@ def afficher_capture_photos(nom, solde):
                 minNeighbors=5,
                 minSize=(30, 30)
             )
+            
+            # Redimensionner pour l'affichage
+            frame_petit = cv2.resize(frame, (400, 300))
+            
+            # Redimensionner aussi les coordonnées des visages
+            echelle = 300 / frame.shape[0]
+            
+            # Dessiner les rectangles autour des visages
+            for (x, y, w, h) in visages:
+                x_petit = int(x * echelle)
+                y_petit = int(y * echelle)
+                w_petit = int(w * echelle)
+                h_petit = int(h * echelle)
+                # Dessiner un rectangle vert
+                cv2.rectangle(frame_petit, (x_petit, y_petit), (x_petit + w_petit, y_petit + h_petit), (0, 255, 0), 2)
             
             # Si un visage est détecté
             if len(visages) > 0:
@@ -442,11 +457,8 @@ def afficher_capture_photos(nom, solde):
                 import time
                 time.sleep(0.5)
             
-            # Afficher le frame redimensionné
-            frame_petit = cv2.resize(frame, (400, 300))
-            frame_rgb = cv2.cvtColor(frame_petit, cv2.COLOR_BGR2RGB)
-            
             # Convertir pour Tkinter
+            frame_rgb = cv2.cvtColor(frame_petit, cv2.COLOR_BGR2RGB)
             img = Image.fromarray(frame_rgb)
             photo = ImageTk.PhotoImage(img)
             
@@ -571,13 +583,24 @@ def afficher_identification():
                         noms.append(nom_personne)
             
             if len(images) > 0:
-                reconnaisseur.train(images, np.array([hash(nom) % 1000 for nom in noms]))
+                # Créer les labels
+                labels_uniques = {}
+                label_id = 0
+                for nom in noms:
+                    if nom not in labels_uniques:
+                        labels_uniques[nom] = label_id
+                        label_id += 1
+                
+                # Créer les arrays
+                images_array = np.array(images)
+                labels_array = np.array([labels_uniques[nom] for nom in noms])
+                
+                # Entraîner
+                reconnaisseur.train(images_array, labels_array)
                 reconnaisseur.save("modele_reconnaissance.yml")
                 
                 # Sauvegarder le mappage
-                label_map = {}
-                for i, nom in enumerate(set(noms)):
-                    label_map[hash(nom) % 1000] = nom
+                label_map = {v: k for k, v in labels_uniques.items()}
                 
                 with open("label_map.json", "w") as f:
                     json.dump(label_map, f)
@@ -611,6 +634,10 @@ def afficher_identification():
                 minSize=(30, 30)
             )
             
+            # Redimensionner pour l'affichage
+            frame_petit = cv2.resize(frame, (400, 300))
+            echelle = 300 / frame.shape[0]
+            
             # Pour chaque visage détecté
             for (x, y, w, h) in visages:
                 # Extraire le visage
@@ -619,8 +646,17 @@ def afficher_identification():
                 # Identifier
                 label, confiance = reconnaisseur.predict(visage)
                 
+                # Afficher le rectangle
+                x_petit = int(x * echelle)
+                y_petit = int(y * echelle)
+                w_petit = int(w * echelle)
+                h_petit = int(h * echelle)
+                
                 # Si reconnu (confiance < 100)
                 if confiance < 100:
+                    # Dessiner en vert
+                    cv2.rectangle(frame_petit, (x_petit, y_petit), (x_petit + w_petit, y_petit + h_petit), (0, 255, 0), 2)
+                    
                     # Récupérer le nom
                     nom = label_map.get(str(label), "Inconnu")
                     
@@ -650,9 +686,11 @@ def afficher_identification():
                         identifie[0] = True
                     
                     break
+                else:
+                    # Dessiner en rouge (pas reconnu)
+                    cv2.rectangle(frame_petit, (x_petit, y_petit), (x_petit + w_petit, y_petit + h_petit), (0, 0, 255), 2)
             
             # Afficher le frame
-            frame_petit = cv2.resize(frame, (400, 300))
             frame_rgb = cv2.cvtColor(frame_petit, cv2.COLOR_BGR2RGB)
             
             img = Image.fromarray(frame_rgb)

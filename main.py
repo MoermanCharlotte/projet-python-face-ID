@@ -1,754 +1,514 @@
 # ====================================================================
-# APPLICATION RECONNAISSANCE FACIALE - RESTAURANT SCOLAIRE
+# APPLICATION SIMPLE - RECONNAISSANCE FACIALE
+# ====================================================================
+# Cette application permet aux utilisateurs de:
+# 1. S'identifier via reconnaissance faciale
+# 2. Débiter leur solde (5€ par repas)
+# Les administrateurs peuvent ajouter/supprimer des personnes
 # ====================================================================
 
-# Importer OpenCV pour la webcam et la reconnaissance faciale
-import cv2
-# Importer os pour créer/gérer des dossiers
-import os
-# Importer numpy pour les calculs mathématiques
-import numpy as np
-# Importer tkinter pour faire l'interface graphique
-from tkinter import *
-# Importer messagebox pour afficher des messages
-from tkinter import messagebox
-# Importer PIL pour afficher des images
-from PIL import Image, ImageTk
-# Importer json pour sauvegarder les soldes
-import json
-# Importer threading pour les traitements en arrière-plan
-import threading
+# Importer les librairies nécessaires
+import cv2           # Pour la webcam et la reconnaissance faciale
+import os            # Pour gérer les dossiers
+import numpy as np   # Pour les tableaux
+from tkinter import *       # Pour l'interface graphique
+from tkinter import messagebox  # Pour les popups
+import json          # Pour stocker les données
 
+# Variables globales pour stocker les éléments de l'interface
+fenetre = None           # La fenêtre principale
+frame_principal = None   # Le cadre principal qui change selon la page
 
 # ====================================================================
-# VARIABLES GLOBALES
+# CRÉER LES DOSSIERS ET FICHIERS NÉCESSAIRES
 # ====================================================================
+# Créer le dossier "data" s'il n'existe pas
+if not os.path.exists("data"):
+    os.makedirs("data")
 
-# Fenêtre principale unique
-fenetre_principale = None
-# Cadre principal (frame)
-frame_principal = None
-# Webcam
-capture_webcam = None
-# Booléen pour arrêter la webcam
-arreter_webcam = False
-
-
-# ====================================================================
-# FONCTION : Créer les dossiers et fichiers
-# ====================================================================
-
-def creer_dossiers_fichiers():
-    # Créer le dossier "data" s'il n'existe pas
-    if not os.path.exists("data"):
-        os.makedirs("data")
-    
-    # Créer le fichier des soldes s'il n'existe pas
-    if not os.path.exists("soldes.json"):
-        with open("soldes.json", "w") as f:
-            json.dump({}, f)
-
-
-# ====================================================================
-# FONCTION : Afficher le menu principal
-# ====================================================================
-
-def afficher_menu_principal():
-    # Détruire tous les widgets du frame
-    for widget in frame_principal.winfo_children():
-        widget.destroy()
-    
-    # Arrêter la webcam si active
-    global arreter_webcam
-    arreter_webcam = True
-    
-    # Titre
-    titre = Label(
-        frame_principal,
-        text="RESTAURANT SCOLAIRE",
-        font=("Arial", 20, "bold"),
-        bg="lightblue"
-    )
-    titre.pack(pady=20)
-    
-    # Sous-titre
-    sous_titre = Label(
-        frame_principal,
-        text="Choisissez une option:",
-        font=("Arial", 14),
-        bg="lightblue"
-    )
-    sous_titre.pack(pady=10)
-    
-    # Bouton Administrateur
-    btn_admin = Button(
-        frame_principal,
-        text="👤 ADMINISTRATEUR",
-        font=("Arial", 12, "bold"),
-        bg="orange",
-        fg="white",
-        width=30,
-        command=afficher_login_admin
-    )
-    btn_admin.pack(pady=15)
-    
-    # Bouton M'identifier
-    btn_identifier = Button(
-        frame_principal,
-        text="✓ M'IDENTIFIER",
-        font=("Arial", 12, "bold"),
-        bg="green",
-        fg="white",
-        width=30,
-        command=afficher_identification
-    )
-    btn_identifier.pack(pady=15)
-
-
-# ====================================================================
-# FONCTION : Afficher le login administrateur
-# ====================================================================
-
-def afficher_login_admin():
-    # Détruire tous les widgets du frame
-    for widget in frame_principal.winfo_children():
-        widget.destroy()
-    
-    # Titre
-    titre = Label(
-        frame_principal,
-        text="CONNEXION ADMINISTRATEUR",
-        font=("Arial", 16, "bold"),
-        bg="lightyellow"
-    )
-    titre.pack(pady=10)
-    
-    # Label Identifiant
-    label_id = Label(
-        frame_principal,
-        text="Identifiant:",
-        font=("Arial", 11),
-        bg="lightyellow"
-    )
-    label_id.pack(pady=5)
-    
-    # Entry Identifiant
-    entree_id = Entry(frame_principal, font=("Arial", 11), width=30)
-    entree_id.pack(pady=5)
-    
-    # Label Mot de passe
-    label_pass = Label(
-        frame_principal,
-        text="Mot de passe:",
-        font=("Arial", 11),
-        bg="lightyellow"
-    )
-    label_pass.pack(pady=5)
-    
-    # Entry Mot de passe
-    entree_pass = Entry(frame_principal, font=("Arial", 11), width=30, show="*")
-    entree_pass.pack(pady=5)
-    
-    # Fonction pour vérifier
-    def verifier():
-        # Récupérer les valeurs
-        id_admin = entree_id.get()
-        pass_admin = entree_pass.get()
-        
-        # Vérifier
-        if id_admin == "admin" and pass_admin == "admin":
-            # Aller à l'interface admin
-            afficher_menu_admin()
-        else:
-            # Afficher une erreur
-            messagebox.showerror("Erreur", "Identifiant ou mot de passe incorrect!")
-    
-    # Bouton Connexion
-    btn_connexion = Button(
-        frame_principal,
-        text="Connexion",
-        font=("Arial", 11),
-        bg="orange",
-        fg="white",
-        width=20,
-        command=verifier
-    )
-    btn_connexion.pack(pady=10)
-    
-    # Bouton Retour
-    btn_retour = Button(
-        frame_principal,
-        text="← RETOUR",
-        font=("Arial", 11),
-        bg="gray",
-        fg="white",
-        width=20,
-        command=afficher_menu_principal
-    )
-    btn_retour.pack(pady=10)
-
-
-# ====================================================================
-# FONCTION : Afficher le menu administrateur
-# ====================================================================
-
-def afficher_menu_admin():
-    # Détruire tous les widgets du frame
-    for widget in frame_principal.winfo_children():
-        widget.destroy()
-    
-    # Titre
-    titre = Label(
-        frame_principal,
-        text="INTERFACE ADMINISTRATEUR",
-        font=("Arial", 14, "bold"),
-        bg="lightyellow"
-    )
-    titre.pack(pady=10)
-    
-    # Label Nom
-    label_nom = Label(
-        frame_principal,
-        text="Nom de la personne:",
-        font=("Arial", 11),
-        bg="lightyellow"
-    )
-    label_nom.pack(pady=5)
-    
-    # Entry Nom
-    entree_nom = Entry(frame_principal, font=("Arial", 11), width=30)
-    entree_nom.pack(pady=5)
-    
-    # Label Solde
-    label_solde = Label(
-        frame_principal,
-        text="Solde initial (€):",
-        font=("Arial", 11),
-        bg="lightyellow"
-    )
-    label_solde.pack(pady=5)
-    
-    # Entry Solde
-    entree_solde = Entry(frame_principal, font=("Arial", 11), width=30)
-    entree_solde.insert(0, "50")
-    entree_solde.pack(pady=5)
-    
-    # Fonction pour ajouter
-    def ajouter():
-        nom = entree_nom.get().strip()
-        solde = entree_solde.get().strip()
-        
-        if nom == "":
-            messagebox.showerror("Erreur", "Veuillez entrer un nom!")
-        else:
-            try:
-                solde = float(solde)
-                # Aller à la capture de photos
-                afficher_capture_photos(nom, solde)
-            except:
-                messagebox.showerror("Erreur", "Le solde doit être un nombre!")
-    
-    # Bouton Ajouter
-    btn_ajouter = Button(
-        frame_principal,
-        text="➕ AJOUTER UNE PERSONNE",
-        font=("Arial", 11),
-        bg="green",
-        fg="white",
-        width=35,
-        command=ajouter
-    )
-    btn_ajouter.pack(pady=10)
-    
-    # Fonction pour afficher la liste
-    def afficher_liste():
-        liste_personnes = os.listdir("data")
-        
-        if len(liste_personnes) == 0:
-            messagebox.showinfo("Liste", "Aucune personne enregistrée.")
-        else:
-            with open("soldes.json", "r") as f:
-                soldes = json.load(f)
-            
-            texte = "Personnes enregistrées:\n\n"
-            for personne in liste_personnes:
-                solde = soldes.get(personne, "0")
-                texte += f"• {personne} (Solde: {solde}€)\n"
-            
-            messagebox.showinfo("Liste des personnes", texte)
-    
-    # Bouton Lister
-    btn_lister = Button(
-        frame_principal,
-        text="📋 LISTER LES PERSONNES",
-        font=("Arial", 11),
-        bg="blue",
-        fg="white",
-        width=35,
-        command=afficher_liste
-    )
-    btn_lister.pack(pady=5)
-    
-    # Fonction pour supprimer
-    def supprimer():
-        nom = entree_nom.get().strip()
-        
-        if nom == "":
-            messagebox.showerror("Erreur", "Veuillez entrer un nom!")
-        else:
-            chemin_dossier = os.path.join("data", nom)
-            
-            if not os.path.exists(chemin_dossier):
-                messagebox.showerror("Erreur", f"La personne '{nom}' n'existe pas!")
-            else:
-                reponse = messagebox.askyesno(
-                    "Confirmation",
-                    f"Êtes-vous sûr de vouloir supprimer '{nom}'?"
-                )
-                
-                if reponse:
-                    import shutil
-                    shutil.rmtree(chemin_dossier)
-                    
-                    with open("soldes.json", "r") as f:
-                        soldes = json.load(f)
-                    
-                    if nom in soldes:
-                        del soldes[nom]
-                    
-                    with open("soldes.json", "w") as f:
-                        json.dump(soldes, f)
-                    
-                    messagebox.showinfo("Succès", f"'{nom}' a été supprimée!")
-                    entree_nom.delete(0, END)
-    
-    # Bouton Supprimer
-    btn_supprimer = Button(
-        frame_principal,
-        text="🗑️ SUPPRIMER UNE PERSONNE",
-        font=("Arial", 11),
-        bg="red",
-        fg="white",
-        width=35,
-        command=supprimer
-    )
-    btn_supprimer.pack(pady=5)
-    
-    # Bouton Retour
-    btn_retour = Button(
-        frame_principal,
-        text="← RETOUR",
-        font=("Arial", 11),
-        bg="gray",
-        fg="white",
-        width=35,
-        command=afficher_menu_principal
-    )
-    btn_retour.pack(pady=10)
-
-
-# ====================================================================
-# FONCTION : Afficher la capture de photos
-# ====================================================================
-
-def afficher_capture_photos(nom, solde):
-    # Détruire tous les widgets du frame
-    for widget in frame_principal.winfo_children():
-        widget.destroy()
-    
-    # Créer le dossier
-    chemin_dossier = os.path.join("data", nom)
-    
-    if os.path.exists(chemin_dossier):
-        messagebox.showerror("Erreur", f"La personne '{nom}' existe déjà!")
-        afficher_menu_admin()
-        return
-    
-    os.makedirs(chemin_dossier)
-    
-    # Sauvegarder le solde
-    with open("soldes.json", "r") as f:
-        soldes_dict = json.load(f)
-    
-    soldes_dict[nom] = solde
-    
+# Créer le fichier "soldes.json" s'il n'existe pas
+# Ce fichier stocke l'argent de chaque personne (ex: {"Alice": 50.0, "Bob": 30.0})
+if not os.path.exists("soldes.json"):
     with open("soldes.json", "w") as f:
-        json.dump(soldes_dict, f)
-    
-    # Titre
-    titre = Label(
-        frame_principal,
-        text=f"CAPTURE DE PHOTOS - {nom}",
-        font=("Arial", 14, "bold"),
-        bg="lightyellow"
-    )
-    titre.pack(pady=10)
-    
-    # Label du statut
-    label_statut = Label(
-        frame_principal,
-        text="Montrez votre visage à la webcam...",
-        font=("Arial", 12),
-        bg="lightyellow"
-    )
-    label_statut.pack(pady=10)
-    
-    # Canvas pour afficher la webcam
-    canvas = Canvas(frame_principal, width=400, height=300, bg="black")
-    canvas.pack(pady=10)
-    
-    # Variables
-    compteur_photos = [0]  # Utiliser une liste pour pouvoir modifier dans la fonction
-    
-    # Fonction pour capturer
-    def capturer_photos():
-        global capture_webcam, arreter_webcam
-        
-        # Ouvrir la webcam
-        capture_webcam = cv2.VideoCapture(0)
-        arreter_webcam = False
-        
-        # Charger le détecteur de visages
-        detecteur_visage = cv2.CascadeClassifier(
-            cv2.data.haarcascades + "haarcascade_frontalface_default.xml"
-        )
-        
-        # Boucle de capture
-        while compteur_photos[0] < 10 and not arreter_webcam:
-            ret, frame = capture_webcam.read()
-            
-            if not ret:
-                break
-            
-            # Convertir en niveaux de gris pour la détection
-            frame_gris = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-            
-            # Détecter les visages
-            visages = detecteur_visage.detectMultiScale(
-                frame_gris,
-                scaleFactor=1.3,
-                minNeighbors=5,
-                minSize=(30, 30)
-            )
-            
-            # Redimensionner pour l'affichage
-            frame_petit = cv2.resize(frame, (400, 300))
-            
-            # Redimensionner aussi les coordonnées des visages
-            echelle = 300 / frame.shape[0]
-            
-            # Dessiner les rectangles autour des visages
-            for (x, y, w, h) in visages:
-                x_petit = int(x * echelle)
-                y_petit = int(y * echelle)
-                w_petit = int(w * echelle)
-                h_petit = int(h * echelle)
-                # Dessiner un rectangle vert
-                cv2.rectangle(frame_petit, (x_petit, y_petit), (x_petit + w_petit, y_petit + h_petit), (0, 255, 0), 2)
-            
-            # Si un visage est détecté
-            if len(visages) > 0:
-                # Sauvegarder la photo
-                chemin_photo = os.path.join(chemin_dossier, f"photo_{compteur_photos[0]}.jpg")
-                cv2.imwrite(chemin_photo, frame_gris)
-                compteur_photos[0] += 1
-                
-                # Attendre un peu avant la prochaine capture (pour diversifier)
-                import time
-                time.sleep(0.5)
-            
-            # Convertir pour Tkinter
-            frame_rgb = cv2.cvtColor(frame_petit, cv2.COLOR_BGR2RGB)
-            img = Image.fromarray(frame_rgb)
-            photo = ImageTk.PhotoImage(img)
-            
-            canvas.create_image(0, 0, image=photo, anchor=NW)
-            canvas.image = photo
-            
-            # Mettre à jour le statut
-            label_statut.config(text=f"Photos capturées: {compteur_photos[0]}/10")
-            frame_principal.update()
-        
-        # Fermer la webcam
-        if capture_webcam:
-            capture_webcam.release()
-        
-        # Vider le canvas
-        canvas.delete("all")
-        
-        # Afficher le résultat
-        label_statut.config(text=f"Capture terminée! {compteur_photos[0]} photos capturées.")
-    
-    # Démarrer la capture dans un thread
-    thread_capture = threading.Thread(target=capturer_photos)
-    thread_capture.start()
-    
-    # Fonction pour arrêter
-    def arreter():
-        global arreter_webcam
-        arreter_webcam = True
-        thread_capture.join()
-        afficher_menu_admin()
-    
-    # Bouton Arrêter
-    btn_arreter = Button(
-        frame_principal,
-        text="⏹️ ARRÊTER",
-        font=("Arial", 11),
-        bg="red",
-        fg="white",
-        width=20,
-        command=arreter
-    )
-    btn_arreter.pack(pady=10)
-
+        json.dump({}, f)
 
 # ====================================================================
-# FONCTION : Afficher l'identification
+# MENU PRINCIPAL - Première page quand on lance l'app
 # ====================================================================
-
-def afficher_identification():
-    # Détruire tous les widgets du frame
+def menu_principal():
+    """
+    Affiche le menu principal avec deux choix:
+    - ADMINISTRATEUR (pour ajouter/supprimer des personnes)
+    - M'IDENTIFIER (pour se reconnaître)
+    """
+    
+    # Vider le frame (supprimer tous les widgets de l'écran précédent)
     for widget in frame_principal.winfo_children():
         widget.destroy()
     
-    # Vérifier qu'il y a des personnes
-    liste_personnes = os.listdir("data")
+    # Afficher le titre
+    Label(frame_principal, text="RESTAURANT", font=("Arial", 20, "bold"), bg="lightblue").pack(pady=20)
     
-    if len(liste_personnes) == 0:
-        messagebox.showerror(
-            "Erreur",
-            "Aucune personne enregistrée!\n"
-            "Allez en mode Administrateur pour ajouter des personnes."
-        )
-        afficher_menu_principal()
-        return
+    # Bouton pour se connecter en tant qu'administrateur
+    Button(frame_principal, text="ADMINISTRATEUR", font=("Arial", 14), bg="orange", fg="white", width=25, command=login_admin).pack(pady=10)
+    
+    # Bouton pour s'identifier avec la reconnaissance faciale
+    Button(frame_principal, text="M'IDENTIFIER", font=("Arial", 14), bg="green", fg="white", width=25, command=mode_identification).pack(pady=10)
+
+# ====================================================================
+# LOGIN ADMINISTRATEUR - Demander le mot de passe
+# ====================================================================
+def login_admin():
+    """
+    Affiche l'écran de connexion pour l'administrateur
+    Les identifiants par défaut sont: admin / admin
+    """
+    
+    # Vider l'écran précédent
+    for widget in frame_principal.winfo_children():
+        widget.destroy()
+    
+    # Titre de la page
+    Label(frame_principal, text="LOGIN ADMIN", font=("Arial", 16, "bold"), bg="lightyellow").pack(pady=10)
+    
+    # Champ pour l'ID
+    Label(frame_principal, text="ID:", font=("Arial", 12), bg="lightyellow").pack()
+    entry_id = Entry(frame_principal, font=("Arial", 12), width=25)
+    entry_id.pack(pady=5)
+    
+    # Champ pour le mot de passe
+    Label(frame_principal, text="PASSWORD:", font=("Arial", 12), bg="lightyellow").pack()
+    entry_pass = Entry(frame_principal, font=("Arial", 12), width=25, show="*")
+    entry_pass.pack(pady=5)
+    
+    def verifier():
+        """Vérifier les identifiants"""
+        # Si ID = "admin" ET mot de passe = "admin", on passe au menu admin
+        if entry_id.get() == "admin" and entry_pass.get() == "admin":
+            menu_admin()
+        else:
+            # Sinon afficher une erreur
+            messagebox.showerror("Erreur", "Incorrect!")
+    
+    # Bouton pour se connecter
+    Button(frame_principal, text="Connexion", font=("Arial", 12), bg="orange", fg="white", command=verifier).pack(pady=10)
+    
+    # Bouton pour revenir au menu principal
+    Button(frame_principal, text="Retour", font=("Arial", 12), bg="gray", fg="white", command=menu_principal).pack(pady=5)
+
+# ====================================================================
+# MENU ADMINISTRATEUR - Ajouter/Lister/Supprimer des personnes
+# ====================================================================
+def menu_admin():
+    """
+    Affiche le menu d'administration avec options pour:
+    - AJOUTER une nouvelle personne (capture 10 photos)
+    - LISTER toutes les personnes
+    - SUPPRIMER une personne
+    """
+    
+    # Vider l'écran
+    for widget in frame_principal.winfo_children():
+        widget.destroy()
     
     # Titre
-    titre = Label(
-        frame_principal,
-        text="IDENTIFICATION",
-        font=("Arial", 14, "bold"),
-        bg="lightgreen"
-    )
-    titre.pack(pady=10)
+    Label(frame_principal, text="ADMINISTRATEUR", font=("Arial", 16, "bold"), bg="lightyellow").pack(pady=10)
     
-    # Label du statut
-    label_statut = Label(
-        frame_principal,
-        text="Montrez votre visage à la webcam...",
-        font=("Arial", 12),
-        bg="lightgreen"
-    )
-    label_statut.pack(pady=10)
+    # Champ pour entrer le nom
+    Label(frame_principal, text="Nom:", font=("Arial", 12), bg="lightyellow").pack()
+    entry_nom = Entry(frame_principal, font=("Arial", 12), width=25)
+    entry_nom.pack(pady=5)
     
-    # Canvas pour afficher la webcam
-    canvas = Canvas(frame_principal, width=400, height=300, bg="black")
-    canvas.pack(pady=10)
+    # Champ pour entrer le solde (argent initial)
+    Label(frame_principal, text="Solde:", font=("Arial", 12), bg="lightyellow").pack()
+    entry_solde = Entry(frame_principal, font=("Arial", 12), width=25)
+    entry_solde.insert(0, "50")  # Par défaut 50€
+    entry_solde.pack(pady=5)
     
-    # Variable pour stocker si identifié
-    identifie = [False]
+    def ajouter():
+        """Ajouter une nouvelle personne"""
+        nom = entry_nom.get().strip()
+        solde = entry_solde.get().strip()
+        
+        # Vérifier que le nom n'est pas vide
+        if not nom:
+            messagebox.showerror("Erreur", "Nom vide!")
+            return
+        
+        # Vérifier que le solde est un nombre valide
+        try:
+            solde = float(solde)
+        except:
+            messagebox.showerror("Erreur", "Solde invalide!")
+            return
+        
+        # Vérifier que la personne n'existe pas déjà
+        chemin = os.path.join("data", nom)
+        if os.path.exists(chemin):
+            messagebox.showerror("Erreur", "Personne existe déjà!")
+            return
+        
+        # Créer le dossier pour stocker les photos
+        os.makedirs(chemin)
+        
+        # Sauvegarder le solde dans le fichier JSON
+        with open("soldes.json", "r") as f:
+            soldes = json.load(f)
+        soldes[nom] = solde
+        with open("soldes.json", "w") as f:
+            json.dump(soldes, f)
+        
+        # Capturer les 10 photos de la personne
+        capturer(nom, chemin)
     
-    # Fonction pour identifier
-    def identifier():
-        global capture_webcam, arreter_webcam
-        
-        # Ouvrir la webcam
-        capture_webcam = cv2.VideoCapture(0)
-        arreter_webcam = False
-        
-        # Charger le détecteur de visages
-        detecteur_visage = cv2.CascadeClassifier(
-            cv2.data.haarcascades + "haarcascade_frontalface_default.xml"
-        )
-        
-        # Charger le reconnaisseur
-        reconnaisseur = cv2.face.LBPHFaceRecognizer_create()
-        
-        # Vérifier que le modèle existe
-        if not os.path.exists("modele_reconnaissance.yml"):
-            # Entraîner le modèle
-            images = []
-            noms = []
-            
-            for nom_personne in liste_personnes:
-                chemin_dossier = os.path.join("data", nom_personne)
-                
-                for nom_photo in os.listdir(chemin_dossier):
-                    chemin_photo = os.path.join(chemin_dossier, nom_photo)
-                    image = cv2.imread(chemin_photo, 0)
-                    
-                    if image is not None:
-                        images.append(image)
-                        noms.append(nom_personne)
-            
-            if len(images) > 0:
-                # Créer les labels
-                labels_uniques = {}
-                label_id = 0
-                for nom in noms:
-                    if nom not in labels_uniques:
-                        labels_uniques[nom] = label_id
-                        label_id += 1
-                
-                # Créer les arrays
-                images_array = np.array(images)
-                labels_array = np.array([labels_uniques[nom] for nom in noms])
-                
-                # Entraîner
-                reconnaisseur.train(images_array, labels_array)
-                reconnaisseur.save("modele_reconnaissance.yml")
-                
-                # Sauvegarder le mappage
-                label_map = {v: k for k, v in labels_uniques.items()}
-                
-                with open("label_map.json", "w") as f:
-                    json.dump(label_map, f)
-        
-        # Charger le modèle
-        reconnaisseur.read("modele_reconnaissance.yml")
-        
-        # Charger le mappage
-        with open("label_map.json", "r") as f:
-            label_map = json.load(f)
+    def lister():
+        """Afficher la liste de toutes les personnes"""
+        personnes = os.listdir("data")
+        if not personnes:
+            messagebox.showinfo("Liste", "Aucun")
+            return
         
         # Charger les soldes
         with open("soldes.json", "r") as f:
             soldes = json.load(f)
         
-        # Boucle d'identification
-        while not identifie[0] and not arreter_webcam:
-            ret, frame = capture_webcam.read()
-            
-            if not ret:
-                break
-            
-            # Convertir en niveaux de gris
-            frame_gris = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-            
-            # Détecter les visages
-            visages = detecteur_visage.detectMultiScale(
-                frame_gris,
-                scaleFactor=1.3,
-                minNeighbors=5,
-                minSize=(30, 30)
-            )
-            
-            # Redimensionner pour l'affichage
-            frame_petit = cv2.resize(frame, (400, 300))
-            echelle = 300 / frame.shape[0]
-            
-            # Pour chaque visage détecté
-            for (x, y, w, h) in visages:
-                # Extraire le visage
-                visage = frame_gris[y:y + h, x:x + w]
-                
-                # Identifier
-                label, confiance = reconnaisseur.predict(visage)
-                
-                # Afficher le rectangle
-                x_petit = int(x * echelle)
-                y_petit = int(y * echelle)
-                w_petit = int(w * echelle)
-                h_petit = int(h * echelle)
-                
-                # Si reconnu (confiance < 100)
-                if confiance < 100:
-                    # Dessiner en vert
-                    cv2.rectangle(frame_petit, (x_petit, y_petit), (x_petit + w_petit, y_petit + h_petit), (0, 255, 0), 2)
-                    
-                    # Récupérer le nom
-                    nom = label_map.get(str(label), "Inconnu")
-                    
-                    # Récupérer le solde
-                    solde_actuel = soldes.get(nom, 0)
-                    
-                    # Vérifier le solde
-                    if solde_actuel >= 5:
-                        # Débiter 5€
-                        soldes[nom] = solde_actuel - 5
-                        
-                        with open("soldes.json", "w") as f:
-                            json.dump(soldes, f)
-                        
-                        # Afficher le succès
-                        label_statut.config(
-                            text=f"✓ Bienvenue {nom}!\nRepas crédité!\nAncien: {solde_actuel:.2f}€ → Nouveau: {soldes[nom]:.2f}€",
-                            fg="green"
-                        )
-                        identifie[0] = True
-                    else:
-                        # Solde insuffisant
-                        label_statut.config(
-                            text=f"✗ {nom}\nSolde insuffisant: {solde_actuel:.2f}€",
-                            fg="red"
-                        )
-                        identifie[0] = True
-                    
-                    break
-                else:
-                    # Dessiner en rouge (pas reconnu)
-                    cv2.rectangle(frame_petit, (x_petit, y_petit), (x_petit + w_petit, y_petit + h_petit), (0, 0, 255), 2)
-            
-            # Afficher le frame
-            frame_rgb = cv2.cvtColor(frame_petit, cv2.COLOR_BGR2RGB)
-            
-            img = Image.fromarray(frame_rgb)
-            photo = ImageTk.PhotoImage(img)
-            
-            canvas.create_image(0, 0, image=photo, anchor=NW)
-            canvas.image = photo
-            
-            frame_principal.update()
+        # Construire le texte à afficher
+        texte = "Personnes:\n\n"
+        for p in personnes:
+            texte += f"{p} - Solde: {soldes.get(p, 0)}€\n"
         
-        # Fermer la webcam
-        if capture_webcam:
-            capture_webcam.release()
+        messagebox.showinfo("Liste", texte)
     
-    # Démarrer l'identification dans un thread
-    thread_id = threading.Thread(target=identifier)
-    thread_id.start()
+    def supprimer():
+        """Supprimer une personne"""
+        nom = entry_nom.get().strip()
+        if not nom:
+            messagebox.showerror("Erreur", "Nom vide!")
+            return
+        
+        chemin = os.path.join("data", nom)
+        if not os.path.exists(chemin):
+            messagebox.showerror("Erreur", "Pas trouvé!")
+            return
+        
+        # Demander confirmation
+        if messagebox.askyesno("Confirmation", f"Supprimer {nom}?"):
+            # Supprimer le dossier
+            import shutil
+            shutil.rmtree(chemin)
+            
+            # Supprimer du fichier soldes.json
+            with open("soldes.json", "r") as f:
+                soldes = json.load(f)
+            if nom in soldes:
+                del soldes[nom]
+            with open("soldes.json", "w") as f:
+                json.dump(soldes, f)
+            
+            messagebox.showinfo("Succès", "Supprimé!")
     
-    # Fonction pour arrêter
-    def arreter():
-        global arreter_webcam
-        arreter_webcam = True
-        thread_id.join()
-        afficher_menu_principal()
-    
-    # Bouton Retour
-    btn_retour = Button(
-        frame_principal,
-        text="← RETOUR",
-        font=("Arial", 11),
-        bg="gray",
-        fg="white",
-        width=20,
-        command=arreter
-    )
-    btn_retour.pack(pady=10)
-
+    # Boutons d'action
+    Button(frame_principal, text="AJOUTER", font=("Arial", 12), bg="green", fg="white", width=25, command=ajouter).pack(pady=5)
+    Button(frame_principal, text="LISTER", font=("Arial", 12), bg="blue", fg="white", width=25, command=lister).pack(pady=5)
+    Button(frame_principal, text="SUPPRIMER", font=("Arial", 12), bg="red", fg="white", width=25, command=supprimer).pack(pady=5)
+    Button(frame_principal, text="Retour", font=("Arial", 12), bg="gray", fg="white", width=25, command=menu_principal).pack(pady=10)
 
 # ====================================================================
-# POINT D'ENTRÉE
+# CAPTURER LES PHOTOS - Prendre 10 photos pour la reconnaissance faciale
 # ====================================================================
+def capturer(nom, chemin):
+    """
+    Capture 10 photos de la personne pour la reconnaissance faciale.
+    
+    Instructions:
+    - Appuyez sur SPACE pour prendre une photo (quand un visage est détecté)
+    - Appuyez sur ESC pour arrêter
+    - Les photos seront sauvegardées en niveaux de gris
+    
+    Paramètres:
+    - nom: le nom de la personne
+    - chemin: le dossier où sauvegarder les photos
+    """
+    
+    messagebox.showinfo("Capture", "Cliquez OK puis montrez votre visage")
+    
+    # Ouvrir la webcam (0 = caméra par défaut)
+    cap = cv2.VideoCapture(0)
+    
+    # Charger le détecteur de visage (algorithme Haar Cascade)
+    detector = cv2.CascadeClassifier(cv2.data.haarcascades + "haarcascade_frontalface_default.xml")
+    
+    compteur = 0  # Compteur des photos prises
+    
+    # Boucle: continuer jusqu'à 10 photos
+    while compteur < 10:
+        ret, frame = cap.read()
+        if not ret:
+            break
+        
+        # Convertir l'image en niveaux de gris (obligatoire pour la reconnaissance)
+        gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+        
+        # Détecter les visages dans l'image
+        # (1.3 = facteur d'échelle, 5 = nombre minimum de voisins)
+        faces = detector.detectMultiScale(gray, 1.3, 5)
+        
+        # Dessiner un rectangle vert autour de chaque visage détecté
+        for (x, y, w, h) in faces:
+            cv2.rectangle(frame, (x, y), (x+w, y+h), (0, 255, 0), 2)
+        
+        # Afficher le compteur sur l'écran
+        cv2.putText(frame, f"Photos: {compteur}/10", (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
+        
+        # Afficher la fenêtre avec le flux vidéo
+        cv2.imshow(f"Capture - {nom}", frame)
+        
+        # Attendre une touche clavier
+        key = cv2.waitKey(1) & 0xFF
+        
+        # SPACE = capturer une photo
+        if key == 32 and len(faces) > 0:
+            # Sauvegarder l'image en niveaux de gris
+            chemin_photo = os.path.join(chemin, f"photo_{compteur}.jpg")
+            cv2.imwrite(chemin_photo, gray)
+            compteur += 1
+        
+        # ESC = arrêter la capture
+        elif key == 27:
+            break
+    
+    # Libérer la caméra
+    cap.release()
+    # Fermer les fenêtres OpenCV
+    cv2.destroyAllWindows()
+    
+    messagebox.showinfo("Succès", f"{compteur} photos capturées!")
+
+# ====================================================================
+# IDENTIFICATION - Reconnaître une personne et débiter son solde
+# ====================================================================
+def mode_identification():
+    """
+    Mode identification par reconnaissance faciale.
+    
+    Processus:
+    1. Charger toutes les photos enregistrées
+    2. Entraîner le modèle LBPH
+    3. Afficher le flux vidéo avec détection de visages
+    4. L'utilisateur clique sur "IDENTIFIER" quand son visage est bien détecté
+    5. Débiter 5€ de son solde
+    """
+    
+    # Vérifier qu'il y a des personnes enregistrées
+    personnes = os.listdir("data")
+    if not personnes:
+        messagebox.showerror("Erreur", "Aucune personne enregistrée!")
+        menu_principal()
+        return
+    
+    # Vider l'écran
+    for widget in frame_principal.winfo_children():
+        widget.destroy()
+    
+    # Titre
+    Label(frame_principal, text="IDENTIFICATION", font=("Arial", 16, "bold"), bg="lightgreen").pack(pady=10)
+    Label(frame_principal, text="Montrez votre visage à la caméra", font=("Arial", 12), bg="lightgreen").pack(pady=5)
+    
+    # ==============================================================
+    # ÉTAPE 1: Charger toutes les photos et entraîner le modèle
+    # ==============================================================
+    
+    images = []      # Liste de toutes les images
+    labels_list = [] # Liste des labels correspondants
+    label_map = {}   # Dictionnaire pour mapper label ID → nom personne
+    label_id = 0     # Compteur pour les IDs de label
+    
+    # Pour chaque personne enregistrée
+    for nom_personne in personnes:
+        chemin_dossier = os.path.join("data", nom_personne)
+        label_map[label_id] = nom_personne  # Mapper l'ID au nom
+        
+        # Pour chaque photo de la personne
+        for nom_photo in os.listdir(chemin_dossier):
+            chemin_photo = os.path.join(chemin_dossier, nom_photo)
+            # Charger l'image en niveaux de gris
+            image = cv2.imread(chemin_photo, 0)
+            if image is not None:
+                images.append(image)
+                labels_list.append(label_id)
+        
+        label_id += 1
+    
+    # Vérifier qu'il y a des images
+    if not images:
+        messagebox.showerror("Erreur", "Pas de photos!")
+        menu_principal()
+        return
+    
+    # Créer et entraîner le modèle LBPH
+    recognizer = cv2.face.LBPHFaceRecognizer_create()
+    recognizer.train(images, np.array(labels_list))
+    
+    print(f"Modèle entraîné avec {len(images)} images, {len(label_map)} personnes")
+    print(f"Mapping: {label_map}")
+    
+    # ==============================================================
+    # ÉTAPE 2: Afficher le flux vidéo avec détection de visages
+    # ==============================================================
+    
+    # Variables pour stocker le flux vidéo
+    cap = cv2.VideoCapture(0)
+    detector = cv2.CascadeClassifier(cv2.data.haarcascades + "haarcascade_frontalface_default.xml")
+    
+    # Charger les soldes
+    with open("soldes.json", "r") as f:
+        soldes = json.load(f)
+    
+    # Variables pour gérer l'identification
+    etat = {"frame_courant": None, "visages_detectes": 0, "identifie": False}
+    
+    # Canvas pour afficher la caméra
+    canvas = Canvas(frame_principal, bg="black", width=400, height=300)
+    canvas.pack(pady=10)
+    
+    # Label pour afficher le statut
+    label_statut = Label(frame_principal, text="En attente...", font=("Arial", 12), bg="lightgreen", fg="blue")
+    label_statut.pack(pady=5)
+    
+    # Label pour afficher le résultat
+    label_resultat = Label(frame_principal, text="", font=("Arial", 14, "bold"), bg="lightgreen")
+    label_resultat.pack(pady=10)
+    
+    def mettre_a_jour_camera():
+        """Mettre à jour l'affichage de la caméra en temps réel"""
+        ret, frame = cap.read()
+        if not ret:
+            return
+        
+        # Redimensionner pour plus rapide
+        frame = cv2.resize(frame, (400, 300))
+        
+        # Convertir en niveaux de gris pour la détection
+        gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+        
+        # Détecter les visages
+        faces = detector.detectMultiScale(gray, 1.3, 5)
+        etat["visages_detectes"] = len(faces)
+        
+        # Dessiner les rectangles pour les visages détectés
+        for (x, y, w, h) in faces:
+            cv2.rectangle(frame, (x, y), (x+w, y+h), (0, 255, 0), 2)
+        
+        # Afficher le nombre de visages détectés
+        texte_visages = f"Visages détectés: {len(faces)}"
+        cv2.putText(frame, texte_visages, (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 0), 2)
+        
+        # Convertir pour Tkinter
+        frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+        from PIL import Image, ImageTk
+        img_pil = Image.fromarray(frame_rgb)
+        img_tk = ImageTk.PhotoImage(img_pil)
+        
+        # Afficher sur le canvas
+        canvas.create_image(0, 0, anchor=NW, image=img_tk)
+        canvas.image = img_tk  # Garder une référence
+        
+        # Sauvegarder le frame actuel
+        etat["frame_courant"] = gray
+        
+        # Mettre à jour le statut
+        if len(faces) > 0:
+            label_statut.config(text="✓ Visage détecté! Cliquez sur IDENTIFIER", fg="green")
+        else:
+            label_statut.config(text="✗ Pas de visage détecté", fg="red")
+        
+        # Appeler à nouveau dans 30ms
+        frame_principal.after(30, mettre_a_jour_camera)
+    
+    def identifier():
+        """Identifier la personne quand on clique sur le bouton"""
+        if etat["frame_courant"] is None or etat["visages_detectes"] == 0:
+            messagebox.showerror("Erreur", "Pas de visage détecté!")
+            return
+        
+        # Détecter à nouveau le visage dans le frame actuel
+        gray = etat["frame_courant"]
+        faces = detector.detectMultiScale(gray, 1.3, 5)
+        
+        if len(faces) == 0:
+            messagebox.showerror("Erreur", "Visage disparu!")
+            return
+        
+        # Utiliser le premier visage détecté
+        (x, y, w, h) = faces[0]
+        visage = gray[y:y+h, x:x+w]
+        
+        # Essayer de reconnaître
+        label, confiance = recognizer.predict(visage)
+        
+        # Afficher la confiance pour déboguer
+        print(f"Confiance: {confiance:.2f}, Label: {label}, Nom: {label_map.get(label, 'Inconnu')}")
+        
+        # Si la confiance est faible (< 100), on reconnaît la personne
+        # IMPORTANT: Plus petit = meilleur (< 100 = assez sûr)
+        if confiance < 100:
+            nom = label_map[label]
+            solde = soldes.get(nom, 0)
+            
+            # Débiter 5€
+            if solde >= 5:
+                soldes[nom] = solde - 5
+                with open("soldes.json", "w") as f:
+                    json.dump(soldes, f)
+                
+                # Afficher le message de succès
+                label_resultat.config(
+                    text=f"✓ Bienvenue {nom}!\n{solde:.2f}€ → {soldes[nom]:.2f}€",
+                    fg="green"
+                )
+                messagebox.showinfo("Succès", f"Bienvenue {nom}!\nSolde: {soldes[nom]:.2f}€")
+            else:
+                # Pas assez d'argent
+                label_resultat.config(
+                    text=f"✗ Solde insuffisant: {solde:.2f}€",
+                    fg="red"
+                )
+                messagebox.showerror("Erreur", f"Solde insuffisant: {solde:.2f}€")
+        else:
+            # Visage non reconnu
+            label_resultat.config(
+                text=f"✗ Visage non reconnu (confiance: {confiance:.1f})",
+                fg="red"
+            )
+            messagebox.showerror("Erreur", f"Visage non reconnu!\nConfiance: {confiance:.1f}")
+    
+    # Bouton pour identifier
+    Button(frame_principal, text="IDENTIFIER", font=("Arial", 14), bg="green", fg="white", width=25, command=identifier).pack(pady=10)
+    
+    # Bouton pour revenir au menu
+    Button(frame_principal, text="Retour", font=("Arial", 12), bg="gray", fg="white", width=25, command=lambda: (cap.release(), cv2.destroyAllWindows(), menu_principal())).pack(pady=5)
+    
+    # Démarrer la mise à jour de la caméra
+    mettre_a_jour_camera()
+
+# ====================================================================
+# LANCER L'APPLICATION
+# ====================================================================
+# Ce code s'exécute quand le programme démarre
 
 if __name__ == "__main__":
-    # Créer les dossiers et fichiers
-    creer_dossiers_fichiers()
-    
     # Créer la fenêtre principale
-    fenetre_principale = Tk()
-    fenetre_principale.title("Restaurant - Reconnaissance Faciale")
-    fenetre_principale.geometry("600x500")
-    fenetre_principale.configure(bg="lightblue")
+    fenetre = Tk()
+    fenetre.title("Restaurant")
+    fenetre.geometry("500x400")
+    fenetre.configure(bg="lightblue")
     
-    # Créer le frame principal
-    frame_principal = Frame(fenetre_principale, bg="lightblue")
+    # Créer le frame principal (le cadre qui contient l'interface)
+    frame_principal = Frame(fenetre, bg="lightblue")
     frame_principal.pack(fill=BOTH, expand=True)
     
-    # Afficher le menu principal
-    afficher_menu_principal()
+    # Afficher le menu principal au démarrage
+    menu_principal()
     
-    # Lancer la fenêtre
-    fenetre_principale.mainloop()
+    # Lancer la boucle principale (écouter les événements de souris/clavier)
+    fenetre.mainloop()

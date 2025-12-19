@@ -1,0 +1,18 @@
+# Dossier avec les données et photos (pas en git)
+data/
+
+# Fichiers Python
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Fichiers de VS Code
+.vscode/
+
+# Fichiers de modèles
+modele_reconnaissance.yml
+label_map.json
+
+# Fichiers de système
+.DS_Store
+Thumbs.db
